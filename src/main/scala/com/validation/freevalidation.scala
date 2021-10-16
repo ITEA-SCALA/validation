@@ -18,8 +18,12 @@ object FreeValidation extends App {
   implicit def liftF[F[_], A](fa: F[A]): Free[F, A] = FlatMap(fa, Return.apply)
 
 
-  case class Person(name: String, age: Int)
+  //
+  abstract class Error (errorCode: Int, errorMsg: String)
+  case object AgeError extends Error (errorCode = 0, errorMsg = "Illegal Age (Age must be over 17)")
+  case object NameError extends Error (errorCode = 1, errorMsg = "Illegal Name (Name must not be empty)")
 
+  //
   sealed trait Validator[A] {
     def validate: Option[Error]
     def unbox: A
@@ -35,9 +39,19 @@ object FreeValidation extends App {
     def unbox: Int = age
   }
 
-  abstract class Error (errorCode: Int, errorMsg: String)
-  case object AgeError extends Error (errorCode = 0, errorMsg = "Illegal Age (Age must be over 17)")
-  case object NameError extends Error (errorCode = 1, errorMsg = "Illegal Name (Name must not be empty)")
+  // ///
+  case class Person(name: String, age: Int)
+//  val person = Person("", 20) // NameError
+//  val person = Person(null, 20) // NullPointerException
+//  val person = Person("John", 0) // AgeError
+  val person = Person("", 17) // AgeError  NameError
+//  val person = Person("John", -1) // AgeError
+//  val person = Person("John", 20) // save John at age 20
+
+  val validation = for {
+    _ <- NameValidator(person.name)
+    _ <- AgeValidator(person.age)
+  } yield ()
 
   sealed trait Executor[F[_]] {
     def exec[A](fa: F[A]): Option[Error]
@@ -49,22 +63,13 @@ object FreeValidation extends App {
     override def exec[A](fa: Validator[A]) = fa.validate
   }
 
-//  val person = Person("", 20) // NameError
-//  val person = Person(null, 20) // NullPointerException
-//  val person = Person("John", 0) // AgeError
-  val person = Person("John", 17) // AgeError
-//  val person = Person("John", -1) // AgeError
-//  val person = Person("John", 20) // save John at age 20
-
-  val validation = for {
-    _ <- NameValidator(person.name)
-    _ <- AgeValidator(person.age)
-  } yield ()
-
-
-  validate(validation, interpreter ) match {
-    case Nil => save(person)
-    case errors => errors foreach println
+  // ///
+  def validate[F[_], A](prg: Free[F, A], interpreter : Executor[F]): List[Error] = {
+    def go(errorList: List[Option[Error]], prg: Free[F, A]): List[Option[Error]] = prg match {
+      case Return(e) => errorList
+      case FlatMap(sub, cont) => go(interpreter.exec(sub) :: errorList, cont(interpreter.unbox(sub)))
+    }
+    go(List.empty[Option[Error]], prg).flatten
   }
 
   def save(p: Person): Boolean = {
@@ -72,11 +77,9 @@ object FreeValidation extends App {
     true
   }
 
-  def validate[F[_], A](prg: Free[F, A], interpreter : Executor[F]): List[Error] = {
-    def go(errorList: List[Option[Error]], prg: Free[F, A]): List[Option[Error]]= prg match {
-      case Return(a) => errorList
-      case FlatMap(sub, cont) => go(interpreter.exec(sub) :: errorList, cont(interpreter.unbox(sub)))
-    }
-    go(List.empty[Option[Error]], prg).flatten
+  // ///
+  validate(validation, interpreter) match {
+    case Nil => save(person)
+    case errors => errors.foreach( println )
   }
 }
