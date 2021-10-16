@@ -61,13 +61,14 @@ object FreeValidation extends App {
     _ <- AgeValidator(person.age)
   } yield ()
 
+
   validate(validation, interpreter ) match {
     case Nil => save(person)
     case errors => errors foreach println
   }
 
-  def save(nameage: Person): Boolean = {
-    println( s"save ${nameage.name} at age ${nameage.age}" )
+  def save(p: Person): Boolean = {
+    println( s"save ${p.name} at age ${p.age}" )
     true
   }
 
