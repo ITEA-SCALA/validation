@@ -4,23 +4,30 @@ import scala.util.{Try, Success, Failure}
 
 object FreeValidation extends App {
 
-  sealed trait Free[ITEMS[_], IN] { // 'ITEMS'='F'  |  'IN'='A'  |  'OUT'='B'
-    def flatMap[OUT](funcIn: IN => Free[ITEMS, OUT]): Free[ITEMS, OUT] = this match {
+//  class Calculator[A[_]: Numeric]{
+//    var x: A = _
+//    def sum(): A = x
+//  }
+
+
+
+  sealed trait Free[SOME_ITEM[ITEM], IN] { // 'SOME_ITEM'='F'  |  'IN'='A'  |  'OUT'='B'
+    def flatMap[OUT] (funcIn: IN => Free[SOME_ITEM, OUT]): Free[SOME_ITEM, OUT] = this match {
       case Return(in) =>
         funcIn(in)
-      case FlatMap(elements, funcElement) =>
-        FlatMap(elements, funcElement.andThen(_.flatMap(funcIn)) ) //TODO: функция 'andThen' - объединяет два экземпляра старую Function-1 в новую Function-1
+      case FlatMap(someElement, funcElement) =>
+        FlatMap(someElement, funcElement.andThen(_.flatMap(funcIn)) ) //TODO: функция 'andThen' - объединяет два экземпляра старую Function-1 в новую Function-1
     }
 
-    def map[OUT](funcIn: IN => OUT): Free[ITEMS, OUT] = {
+    def map[OUT] (funcIn: IN => OUT): Free[SOME_ITEM, OUT] = {
       flatMap(in => Return( funcIn(in) ))
     }
   }
 
-  case class Return[ITEMS[_], IN] (in: IN) extends Free[ITEMS, IN]                                                             //TODO:  Return (in: IN)
-  case class FlatMap[ITEMS[_], ITEM, IN] (elements: ITEMS[ITEM], funcElement: ITEM => Free[ITEMS, IN]) extends Free[ITEMS, IN] //TODO:  FlatMap (elements: ITEMS[ITEM], funcElement: ITEM => Free[ITEMS, IN])
+  case class Return[SOME_ITEM[ITEM], IN] (in: IN) extends Free[SOME_ITEM, IN]                                                                        //TODO:  Return (in: IN)
+  case class FlatMap[SOME_ITEM[ITEM], ITEM, IN] (someElement: SOME_ITEM[ITEM], funcElement: ITEM => Free[SOME_ITEM, IN]) extends Free[SOME_ITEM, IN] //TODO:  FlatMap (elements: ITEMS[ITEM], funcElement: ITEM => Free[ITEMS, IN])
 
-  implicit def liftITEMS[ITEMS[_], IN] (elements: ITEMS[IN]): Free[ITEMS, IN] = FlatMap(elements, Return.apply)                //TODO: liftITEMS (elements: ITEMS[IN]): Free[ITEMS, IN]
+  implicit def liftITEMS[SOME_ITEM[ITEM], IN] (elements: SOME_ITEM[IN]): Free[SOME_ITEM, IN] = FlatMap(elements, Return.apply)                       //TODO: liftITEMS (elements: ITEMS[IN]): Free[ITEMS, IN]
 
 
   //
@@ -41,12 +48,18 @@ object FreeValidation extends App {
   }
 
   case class NameValidator(name: String) extends Validator[String] {
-    def validate = if (name.isEmpty) Some(NameError) else None
+    def validate = {
+      if (name.isEmpty) Some(NameError)
+      else None
+    }
     def unbox: String = name
   }
 
   case class AgeValidator(age: Int) extends Validator[Int] {
-    def validate = if (age >= 18) None else Some(AgeError)
+    def validate = {
+      if (age >= 18) None
+      else Some(AgeError)
+    }
     def unbox: Int = age
   }
 
@@ -62,8 +75,11 @@ object FreeValidation extends App {
   val validation = for {
     _ <- NameValidator(person.name)
     _ <- AgeValidator(person.age)
-  } yield ()
+  } yield save(person)
 
+
+
+  // ///
   sealed trait Executor[F[_]] {
     def exec[A](fa: F[A]): Option[Error]
     def unbox[A](fa: F[A]): A
