@@ -19,7 +19,14 @@ object FreeValidation extends App {
 
 
   //
-  abstract class Error (errorCode: Int, errorMsg: String)
+  abstract class Error (errorCode: Int, errorMsg: String) {
+    override def toString: String =
+//      s"""errorCode: $errorCode
+//         |errorMsg: \"$errorMsg\"
+//         |""".stripMargin
+      s"""errorMsg: \"$errorMsg\"
+         |""".stripMargin
+  }
   case object AgeError extends Error (errorCode = 0, errorMsg = "Illegal Age (Age must be over 17)")
   case object NameError extends Error (errorCode = 1, errorMsg = "Illegal Name (Name must not be empty)")
 
@@ -41,12 +48,12 @@ object FreeValidation extends App {
 
   // ///
   case class Person(name: String, age: Int)
-//  val person = Person("", 20) // NameError
+//  val person = Person("", 20) // errorMsg: "Illegal Name (Name must not be empty)"
 //  val person = Person(null, 20) // NullPointerException
-//  val person = Person("John", 0) // AgeError
-  val person = Person("", 17) // AgeError  NameError
+//  val person = Person("John", 0) // errorMsg: "Illegal Age (Age must be over 17)"
+//  val person = Person("", 17) // AgeError  NameError
 //  val person = Person("John", -1) // AgeError
-//  val person = Person("John", 20) // save John at age 20
+  val person = Person("John", 20) // save John at age 20
 
   val validation = for {
     _ <- NameValidator(person.name)
