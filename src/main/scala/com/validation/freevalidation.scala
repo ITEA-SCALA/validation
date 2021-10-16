@@ -4,18 +4,23 @@ import scala.util.{Try, Success, Failure}
 
 object FreeValidation extends App {
 
-  sealed trait Free[F[_], A] {
-    def flatMap[B](f: A => Free[F, B]): Free[F, B] = this match {
-      case Return(a) => f(a)
-      case FlatMap(sub, cont) => FlatMap(sub, cont andThen (_ flatMap f))
+  sealed trait Free[ITEMS[_], IN] { // 'ITEMS'='F'  |  'IN'='A'  |  'OUT'='B'
+    def flatMap[OUT](funcIn: IN => Free[ITEMS, OUT]): Free[ITEMS, OUT] = this match {
+      case Return(in) =>
+        funcIn(in)
+      case FlatMap(elements, funcElement) =>
+        FlatMap(elements, funcElement.andThen(_.flatMap(funcIn)) ) //TODO: функция 'andThen' - объединяет два экземпляра старую Function-1 в новую Function-1
     }
 
-    def map[B](f: A => B): Free[F, B] = flatMap(a => Return(f(a)))
+    def map[OUT](funcIn: IN => OUT): Free[ITEMS, OUT] = {
+      flatMap(in => Return( funcIn(in) ))
+    }
   }
-  final case class Return[F[_], A](a: A) extends Free[F, A]
-  case class FlatMap[F[_], I, A](sub: F[I], cont: I => Free[F, A]) extends Free[F, A]
 
-  implicit def liftF[F[_], A](fa: F[A]): Free[F, A] = FlatMap(fa, Return.apply)
+  case class Return[ITEMS[_], IN] (in: IN) extends Free[ITEMS, IN]                                                             //TODO:  Return (in: IN)
+  case class FlatMap[ITEMS[_], ITEM, IN] (elements: ITEMS[ITEM], funcElement: ITEM => Free[ITEMS, IN]) extends Free[ITEMS, IN] //TODO:  FlatMap (elements: ITEMS[ITEM], funcElement: ITEM => Free[ITEMS, IN])
+
+  implicit def liftITEMS[ITEMS[_], IN] (elements: ITEMS[IN]): Free[ITEMS, IN] = FlatMap(elements, Return.apply)                //TODO: liftITEMS (elements: ITEMS[IN]): Free[ITEMS, IN]
 
 
   //
@@ -24,8 +29,7 @@ object FreeValidation extends App {
 //      s"""errorCode: $errorCode
 //         |errorMsg: \"$errorMsg\"
 //         |""".stripMargin
-      s"""errorMsg: \"$errorMsg\"
-         |""".stripMargin
+      s"""errorMsg: \"$errorMsg\"""".stripMargin
   }
   case object AgeError extends Error (errorCode = 0, errorMsg = "Illegal Age (Age must be over 17)")
   case object NameError extends Error (errorCode = 1, errorMsg = "Illegal Name (Name must not be empty)")
@@ -51,9 +55,9 @@ object FreeValidation extends App {
 //  val person = Person("", 20) // errorMsg: "Illegal Name (Name must not be empty)"
 //  val person = Person(null, 20) // NullPointerException
 //  val person = Person("John", 0) // errorMsg: "Illegal Age (Age must be over 17)"
-//  val person = Person("", 17) // AgeError  NameError
+  val person = Person("", 17) // AgeError  NameError
 //  val person = Person("John", -1) // AgeError
-  val person = Person("John", 20) // save John at age 20
+//  val person = Person("John", 20) // save John at age 20
 
   val validation = for {
     _ <- NameValidator(person.name)
